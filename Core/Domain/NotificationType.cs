@@ -1,9 +1,9 @@
-namespace microservices_project.Core.Domain;
+// namespace microservices_project.Core.Domain;
 
-public enum NotificationType
-{
-    Email,
-    SMS,
-    Push,
-    Messenger
-}
+// public enum NotificationType
+// {
+//     Email,
+//     SMS,
+//     Push,
+//     Messenger
+// }

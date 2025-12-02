@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("microservices_project")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58cf70e7de1b94a26d56be2f65401d52755ecfd5")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bcf8f0fae2a494d0488b03a47f59a508c6163a41")]
 [assembly: System.Reflection.AssemblyProductAttribute("microservices_project")]
 [assembly: System.Reflection.AssemblyTitleAttribute("microservices_project")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
