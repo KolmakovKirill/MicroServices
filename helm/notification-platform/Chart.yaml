@@ -1,0 +1,5 @@
+apiVersion: v2
+name: notification-platform
+description: A distributed notification platform (Email, Push, SMS) with RabbitMQ, Postgres, Prometheus, Grafana, ELK
+version: 0.1.0
+appVersion: "1.0"

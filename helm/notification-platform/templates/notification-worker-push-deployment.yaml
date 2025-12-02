@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker-push
+spec:
+  replicas: {{ .Values.workerPush.replicas }}
+  selector:
+    matchLabels:
+      app: notification-worker-push
+  template:
+    metadata:
+      labels:
+        app: notification-worker-push
+    spec:
+      containers:
+        - name: notification-worker-push
+          image: {{ .Values.workerPush.image }}
+          env:
+            - name: RabbitMQ__Host
+              value: {{ .Values.workerPush.env.rabbitmq_host | quote }}
+            - name: RabbitMQ__User
+              value: {{ .Values.workerPush.env.rabbitmq_user | quote }}
+            - name: RabbitMQ__Pass
+              value: {{ .Values.workerPush.env.rabbitmq_pass | quote }}
+            - name: ConnectionStrings__Default
+              value: {{ .Values.workerPush.env.connectionString | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker-push
+spec:
+  selector:
+    app: notification-worker-push
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

@@ -1,33 +1,121 @@
+version: '3.9'
 services:
-  db:
-    image: postgres:13
-    container_name: db
-    restart: always
-    env_file: ./.env
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: notif_user
+      POSTGRES_PASSWORD: notif_pass
+      POSTGRES_DB: notifications
     ports:
-      - 5332:5432
+      - "5432:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
-    
-  minio:  
-    image: minio/minio
-    container_name: kaleidoskop_minio
-    restart: unless-stopped  
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - 9010:9000
-      - 9011:9001
-    expose:
-      - "9000"
-    volumes:  
-      - minio-storage:/data  
-    environment:  
-      - MINIO_ROOT_USER=miniouser  
-      - MINIO_ROOT_PASSWORD=admin123
-    command: server /data --console-address ":9001"  
-    healthcheck:  
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]  
-      interval: 30s  
-      timeout: 20s  
-      retries: 3
-    profiles:
-      - donotstart
+      - "5672:5672"
+      - "15672:15672"
+  elasticsearch:
+    image: elasticsearch:8.11.3
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+  kibana:
+    image: kibana:8.11.3
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.3
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/logs # будет путь для сбора логов
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+  notification-api:
+    build: ./Notification.Api
+    ports:
+      - "5000:80"
+    depends_on:
+      - postgres
+      - rabbitmq
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: guest
+      RabbitMQ__Pass: guest
+      Elastic__Url: http://elasticsearch:9200
+      MongoHost: mongo
+  notification-worker-email:
+    build: ./Notification.Worker.Email
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      SMTP__Host: smtp.yourmail.com
+      SMTP__Port: 587
+      SMTP__User: youruser
+      SMTP__Pass: yourpass
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: guest
+      RabbitMQ__Pass: guest
+      ConnectionStrings__Default: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+  notification-worker-push:
+    build: ./Notification.Worker.Push
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: guest
+      RabbitMQ__Pass: guest
+      ConnectionStrings__Default: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+  notification-worker-sms:
+    build: ./Notification.Worker.Sms
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__User: guest
+      RabbitMQ__Pass: guest
+      ConnectionStrings__Default: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+  # mongo (опционно, выключен):
+  # mongo:
+  #   image: mongo:7
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongodata:/data/db
+volumes:
+  pgdata:
+  grafana_data:
+  esdata:
+  # mongodata:

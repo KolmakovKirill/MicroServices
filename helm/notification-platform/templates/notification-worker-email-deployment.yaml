@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker-email
+spec:
+  replicas: {{ .Values.workerEmail.replicas }}
+  selector:
+    matchLabels:
+      app: notification-worker-email
+  template:
+    metadata:
+      labels:
+        app: notification-worker-email
+    spec:
+      containers:
+        - name: notification-worker-email
+          image: {{ .Values.workerEmail.image }}
+          env:
+            - name: SMTP__Host
+              value: {{ .Values.workerEmail.env.smtp_host | quote }}
+            - name: SMTP__Port
+              value: {{ .Values.workerEmail.env.smtp_port | quote }}
+            - name: SMTP__User
+              value: {{ .Values.workerEmail.env.smtp_user | quote }}
+            - name: SMTP__Pass
+              value: {{ .Values.workerEmail.env.smtp_pass | quote }}
+            - name: RabbitMQ__Host
+              value: {{ .Values.workerEmail.env.rabbitmq_host | quote }}
+            - name: RabbitMQ__User
+              value: {{ .Values.workerEmail.env.rabbitmq_user | quote }}
+            - name: RabbitMQ__Pass
+              value: {{ .Values.workerEmail.env.rabbitmq_pass | quote }}
+            - name: ConnectionStrings__Default
+              value: {{ .Values.workerEmail.env.connectionString | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker-email
+spec:
+  selector:
+    app: notification-worker-email
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

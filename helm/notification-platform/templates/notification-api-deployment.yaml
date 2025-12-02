@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-api
+spec:
+  replicas: {{ .Values.notificationApi.replicas }}
+  selector:
+    matchLabels:
+      app: notification-api
+  template:
+    metadata:
+      labels:
+        app: notification-api
+    spec:
+      containers:
+        - name: notification-api
+          image: {{ .Values.notificationApi.image }}
+          ports:
+            - containerPort: {{ .Values.notificationApi.service.port }}
+          env:
+            - name: ConnectionStrings__Default
+              value: {{ .Values.notificationApi.env.connectionString | quote }}
+            - name: RabbitMQ__Host
+              value: {{ .Values.notificationApi.env.rabbitmq_host | quote }}
+            - name: RabbitMQ__User
+              value: {{ .Values.notificationApi.env.rabbitmq_user | quote }}
+            - name: RabbitMQ__Pass
+              value: {{ .Values.notificationApi.env.rabbitmq_pass | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-api
+spec:
+  selector:
+    app: notification-api
+  ports:
+    - protocol: TCP
+      port: {{ .Values.notificationApi.service.port }}
+      targetPort: {{ .Values.notificationApi.service.port }}

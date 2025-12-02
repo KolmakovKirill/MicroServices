@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'notification-api'
+    static_configs:
+      - targets: ['notification-api:80']
+  - job_name: 'notification-worker-email'
+    static_configs:
+      - targets: ['notification-worker-email:80']
+  - job_name: 'notification-worker-push'
+    static_configs:
+      - targets: ['notification-worker-push:80']
+  - job_name: 'notification-worker-sms'
+    static_configs:
+      - targets: ['notification-worker-sms:80']

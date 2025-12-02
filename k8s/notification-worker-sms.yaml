@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker-sms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-worker-sms
+  template:
+    metadata:
+      labels:
+        app: notification-worker-sms
+    spec:
+      containers:
+        - name: notification-worker-sms
+          image: notification-worker-sms:latest
+          env:
+            - name: RabbitMQ__Host
+              value: "rabbitmq"
+            - name: RabbitMQ__User
+              value: "guest"
+            - name: RabbitMQ__Pass
+              value: "guest"
+            - name: ConnectionStrings__Default
+              value: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker-sms
+spec:
+  selector:
+    app: notification-worker-sms
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

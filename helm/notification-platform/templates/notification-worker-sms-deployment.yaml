@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker-sms
+spec:
+  replicas: {{ .Values.workerSms.replicas }}
+  selector:
+    matchLabels:
+      app: notification-worker-sms
+  template:
+    metadata:
+      labels:
+        app: notification-worker-sms
+    spec:
+      containers:
+        - name: notification-worker-sms
+          image: {{ .Values.workerSms.image }}
+          env:
+            - name: RabbitMQ__Host
+              value: {{ .Values.workerSms.env.rabbitmq_host | quote }}
+            - name: RabbitMQ__User
+              value: {{ .Values.workerSms.env.rabbitmq_user | quote }}
+            - name: RabbitMQ__Pass
+              value: {{ .Values.workerSms.env.rabbitmq_pass | quote }}
+            - name: ConnectionStrings__Default
+              value: {{ .Values.workerSms.env.connectionString | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker-sms
+spec:
+  selector:
+    app: notification-worker-sms
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker-email
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-worker-email
+  template:
+    metadata:
+      labels:
+        app: notification-worker-email
+    spec:
+      containers:
+        - name: notification-worker-email
+          image: notification-worker-email:latest
+          env:
+            - name: SMTP__Host
+              value: "smtp.yourmail.com"
+            - name: SMTP__Port
+              value: "587"
+            - name: SMTP__User
+              value: "youruser"
+            - name: SMTP__Pass
+              value: "yourpass"
+            - name: RabbitMQ__Host
+              value: "rabbitmq"
+            - name: RabbitMQ__User
+              value: "guest"
+            - name: RabbitMQ__Pass
+              value: "guest"
+            - name: ConnectionStrings__Default
+              value: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker-email
+spec:
+  selector:
+    app: notification-worker-email
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

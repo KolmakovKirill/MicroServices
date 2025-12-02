@@ -1,0 +1,79 @@
+# notification-platform values.yaml
+
+notificationApi:
+  image: notification-api:latest
+  replicas: 1
+  service:
+    port: 80
+  env:
+    connectionString: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+    rabbitmq_host: rabbitmq
+    rabbitmq_user: guest
+    rabbitmq_pass: guest
+
+workerEmail:
+  image: notification-worker-email:latest
+  replicas: 1
+  env:
+    smtp_host: smtp.yourmail.com
+    smtp_port: "587"
+    smtp_user: youruser
+    smtp_pass: yourpass
+    rabbitmq_host: rabbitmq
+    rabbitmq_user: guest
+    rabbitmq_pass: guest
+    connectionString: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+
+workerPush:
+  image: notification-worker-push:latest
+  replicas: 1
+  env:
+    rabbitmq_host: rabbitmq
+    rabbitmq_user: guest
+    rabbitmq_pass: guest
+    connectionString: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+
+workerSms:
+  image: notification-worker-sms:latest
+  replicas: 1
+  env:
+    rabbitmq_host: rabbitmq
+    rabbitmq_user: guest
+    rabbitmq_pass: guest
+    connectionString: "Host=postgres;Database=notifications;Username=notif_user;Password=notif_pass"
+
+postgresql:
+  image: postgres:15
+  storage: 1Gi
+  user: notif_user
+  password: notif_pass
+  database: notifications
+  port: 5432
+
+rabbitmq:
+  image: rabbitmq:3-management
+  port: 5672
+  managementPort: 15672
+  user: guest
+  password: guest
+
+elasticsearch:
+  image: elasticsearch:8.11.3
+  port: 9200
+
+kibana:
+  image: kibana:8.11.3
+  port: 5601
+
+prometheus:
+  image: prom/prometheus:latest
+  port: 9090
+
+grafana:
+  image: grafana/grafana
+  port: 3000
+
+# Включить если нужен публичный доступ через ingress-контроллер
+# ingress:
+#   enabled: true
+#   host: notify.local
