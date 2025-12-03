@@ -15,7 +15,7 @@ public class KafkaProducerService : IDisposable
             EnableIdempotence = true
         };
 
-        _producer = new ProducerBuilder<Null, string>(producerConfig).Build(); // [web:72][web:76]
+        _producer = new ProducerBuilder<Null, string>(producerConfig).Build(); 
     }
 
     public async Task SendAsync(string topic, string message, CancellationToken ct = default)
@@ -25,7 +25,6 @@ public class KafkaProducerService : IDisposable
             new Message<Null, string> { Value = message },
             ct);
 
-        // логирование offset/partition по желанию
         Console.WriteLine($"Sent to {result.TopicPartitionOffset}");
     }
 
