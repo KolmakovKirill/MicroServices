@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using microservices_project.Infrastructure.DataStorage;
@@ -11,9 +12,11 @@ using microservices_project.Infrastructure.DataStorage;
 namespace microservices_project.Migrations
 {
     [DbContext(typeof(ServerDbContext))]
-    partial class ServerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251207155937_RemoveHashPasswordFromUser")]
+    partial class RemoveHashPasswordFromUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,16 +36,11 @@ namespace microservices_project.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("NotificationId")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("NotificationId");
 
                     b.ToTable("Medias");
                 });
@@ -85,7 +83,30 @@ namespace microservices_project.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notification");
+                });
+
+            modelBuilder.Entity("microservices_project.Core.Domain.NotificationMedia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("MediaId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("NotificationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaId");
+
+                    b.HasIndex("NotificationId");
+
+                    b.ToTable("NotificationMedia");
                 });
 
             modelBuilder.Entity("microservices_project.Core.Domain.User", b =>
@@ -115,17 +136,6 @@ namespace microservices_project.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("microservices_project.Core.Domain.Media", b =>
-                {
-                    b.HasOne("microservices_project.Core.Domain.Notification", "Notification")
-                        .WithMany("Medias")
-                        .HasForeignKey("NotificationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Notification");
-                });
-
             modelBuilder.Entity("microservices_project.Core.Domain.Notification", b =>
                 {
                     b.HasOne("microservices_project.Core.Domain.User", "User")
@@ -137,9 +147,28 @@ namespace microservices_project.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("microservices_project.Core.Domain.NotificationMedia", b =>
+                {
+                    b.HasOne("microservices_project.Core.Domain.Media", "Media")
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("microservices_project.Core.Domain.Notification", "Notification")
+                        .WithMany("MediaFiles")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Notification");
+                });
+
             modelBuilder.Entity("microservices_project.Core.Domain.Notification", b =>
                 {
-                    b.Navigation("Medias");
+                    b.Navigation("MediaFiles");
                 });
 
             modelBuilder.Entity("microservices_project.Core.Domain.User", b =>

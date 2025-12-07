@@ -2,6 +2,7 @@ using Minio;
 using microservices_project.Infrastructure.DataStorage;
 using microservices_project.Infrastructure.DataStorage.Services;
 using microservices_project.Infrastructure.Messaging.Services;
+// using microservices_project.Infrastructure.DataStorage.Profiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,11 +14,14 @@ builder.Services.AddMinio(configureClient => configureClient
 
 builder.Services.AddDbContext<ServerDbContext>();
 builder.Services.AddScoped<MediaService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<KafkaProducerService>();
 builder.Services.AddHostedService<KafkaConsumerService>();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
+// builder.Services.AddAutoMapper(typeof(AppMappingProfile));
 
 await KafkaTopicInitializer.EnsureTopicsAsync(builder.Configuration);
 

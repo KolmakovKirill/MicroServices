@@ -7,8 +7,8 @@ namespace microservices_project.Infrastructure.DataStorage;
 public class ServerDbContext : DbContext
 {
     public DbSet<Media> Medias { get; set; }
-    // public DbSet<User> Users { get; set; }
-    // public DbSet<Notification> Notifications { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     public ServerDbContext(DbContextOptions<ServerDbContext> options) : base(options) {}
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

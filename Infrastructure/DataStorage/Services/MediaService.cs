@@ -38,7 +38,7 @@ public class MediaService
 
     }
 
-    public async Task<Media> CreateMediaAsync(IFormFile file)
+    public async Task<Media> AddAsync(IFormFile file, Notification notification)
     {
         var objectName = Guid.NewGuid() + "-" + file.FileName;
 
@@ -59,7 +59,8 @@ public class MediaService
         var media = new Media
         {
             Source = objectName,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Notification = notification
         };
 
         _context.Medias.Add(media);
@@ -68,9 +69,9 @@ public class MediaService
         return media;
     }
 
-    public async Task<Media?> GetMediaAsync(long id) => await _context.Medias.FirstOrDefaultAsync(m => m.Id == id);
+    public async Task<Media?> FindAsync(long id) => await _context.Medias.FirstOrDefaultAsync(m => m.Id == id);
 
-    public async Task<bool> DeleteMediaAsync(int id)
+    public async Task<bool> RemoveAsync(int id)
     {
         var media = await _context.Medias.FirstOrDefaultAsync(m => m.Id == id);
 

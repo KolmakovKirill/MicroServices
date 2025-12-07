@@ -13,5 +13,5 @@ public class Notification : Entity<long>
     public DateTime CreatedAt { get; set; }
     public DateTime? SentAt { get; set; }
     public string? ErrorMessage { get; set; }
-    public ICollection<NotificationMedia> MediaFiles { get; set; } = new List<NotificationMedia>();
+    public ICollection<Media> Medias { get; set; } = new List<Media>();
 }

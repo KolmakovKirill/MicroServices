@@ -7,8 +7,8 @@ public class User : Entity<long>
     public string Username { get; set; } = null!;
     public string Email { get; set; } = null!;
     public string? PhoneNumber { get; set; }
-    public string PasswordHash { get; set; } = null!;
+    // public string PasswordHash { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
-    //public ICollection<UserChannel> Channels { get; set; } = new List<UserChannel>(); Не знаю, точно ли нужно будет, поэтому пусть покуа будет так
+    //public ICollection<UserChannel> Channels { get; set; } = new List<UserChannel>(); пїЅпїЅ пїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }
