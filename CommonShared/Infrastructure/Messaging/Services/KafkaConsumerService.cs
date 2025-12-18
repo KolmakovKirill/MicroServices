@@ -1,10 +1,11 @@
 using System.Reactive;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Handlers;
+using CommonShared.Infrastructure.Messaging.Models;
+using CommonShared.Infrastructure.Messaging.Serializers;
 using Confluent.Kafka;
 
 namespace CommonShared.Infrastructure.Messaging.Services;
-
 
 public class KafkaConsumerService<HandlerClass> : BackgroundService 
     where HandlerClass : Handler
@@ -13,7 +14,7 @@ public class KafkaConsumerService<HandlerClass> : BackgroundService
     private readonly string _topic = "notifications";
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _config;
-    private IConsumer<string, long>? _consumer;
+    private IConsumer<string, NotificationMessage>? _consumer;
 
     public KafkaConsumerService(IConfiguration config,
                                 ILogger<KafkaConsumerService<HandlerClass>> logger,
@@ -28,11 +29,11 @@ public class KafkaConsumerService<HandlerClass> : BackgroundService
     {
         return Task.Run(async () =>
         {
-            // Initialize consumer in ExecuteAsync to ensure network is ready
             var bootstrapServers = _config["Kafka:BootstrapServers"];
             var groupId = _config["Kafka:GroupId"];
 
-            _logger.LogInformation("Initializing Kafka consumer with BootstrapServers: {BootstrapServers}, GroupId: {GroupId}", bootstrapServers, groupId);
+            _logger.LogInformation("Initializing Kafka consumer with BootstrapServers: {BootstrapServers}, GroupId: {GroupId}", 
+                bootstrapServers, groupId);
 
             var consumerConfig = new ConsumerConfig
             {
@@ -42,7 +43,10 @@ public class KafkaConsumerService<HandlerClass> : BackgroundService
                 EnableAutoCommit = true
             };
 
-            _consumer = new ConsumerBuilder<string, long>(consumerConfig).Build();
+            _consumer = new ConsumerBuilder<string, NotificationMessage>(consumerConfig)
+                .SetValueDeserializer(new JsonDeserializer<NotificationMessage>())
+                .Build();
+            
             _consumer.Subscribe(_topic);
 
             _logger.LogInformation("Kafka consumer initialized for topic {Topic}", _topic);
@@ -54,21 +58,22 @@ public class KafkaConsumerService<HandlerClass> : BackgroundService
                     if (_consumer == null) break;
 
                     var cr = _consumer.Consume(stoppingToken);
-                    var notificationId = cr.Message.Value;
+                    var notificationMessage = cr.Message.Value;
+                    var notificationId = notificationMessage.NotificationId;
+                    var notificationType = notificationMessage.NotificationType;
+
                     var scope = _serviceProvider.CreateScope();
 
-                    var _notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
                     var handler = scope.ServiceProvider.GetRequiredService<HandlerClass>();
-
-                    var notification = await _notificationService.FindAsync(notificationId);
-                    if (notification == null)
+                    if (handler.Type.ToString() == notificationType)
                     {
-                        _logger.LogWarning("Не обнаружено уведомления с таким ID!");
-                        continue;
-                    }
-
-                    if (handler.Type == notification.Type)
-                    {
+                        var _notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
+                        var notification = await _notificationService.FindAsync(notificationId);
+                        if (notification == null)
+                        {
+                            _logger.LogWarning("Не обнаружено уведомления с таким ID: {NotificationId}", notificationId);
+                            return;
+                        }
                         handler.HandleTask(notification, stoppingToken);
                     }
                 }

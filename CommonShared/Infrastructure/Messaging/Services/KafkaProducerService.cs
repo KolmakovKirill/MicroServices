@@ -1,10 +1,13 @@
 using Confluent.Kafka;
+using CommonShared.Infrastructure.Messaging.Models;
+using CommonShared.Infrastructure.Messaging.Serializers;
+using CommonShared.Core.Domain;
 
 namespace CommonShared.Infrastructure.Messaging.Services;
 
 public class KafkaProducerService : IDisposable
 {
-    private readonly IProducer<string, long> _producer;
+    private readonly IProducer<string, NotificationMessage> _producer;
 
     public KafkaProducerService(IConfiguration config)
     {
@@ -15,14 +18,26 @@ public class KafkaProducerService : IDisposable
             EnableIdempotence = true
         };
 
-        _producer = new ProducerBuilder<string, long>(producerConfig).Build(); 
+        _producer = new ProducerBuilder<string, NotificationMessage>(producerConfig)
+            .SetValueSerializer(new JsonSerializer<NotificationMessage>())
+            .Build();
     }
 
-    public async Task SendAsync(string topic, long notificationId, CancellationToken ct = default)
+    public async Task SendAsync(string topic, long notificationId, NotificationType notificationType, CancellationToken ct = default)
     {
+        var message = new NotificationMessage
+        {
+            NotificationId = notificationId,
+            NotificationType = notificationType.ToString()
+        };
+
         await _producer.ProduceAsync(
             topic,
-            new Message<string, long> { Key = "notificationId", Value = notificationId },
+            new Message<string, NotificationMessage> 
+            { 
+                Key = notificationId.ToString(), 
+                Value = message 
+            },
             ct);
     }
 
