@@ -15,6 +15,10 @@ public class CreateUserDTO
     [Phone]
     public string? PhoneNumber { get; set; }
 
+    public string? DeviceToken { get; set; }
+
+    public string? MessengerId { get; set; }
+
     // [Required]
     // [MinLength(6)]
     // public string Password { get; set; } = null!;

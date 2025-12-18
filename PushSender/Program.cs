@@ -19,11 +19,11 @@ builder.Services.AddDbContext<ServerDbContext>(options =>
         npgsql => npgsql.MigrationsAssembly("CommonShared")
     );
 });
-builder.Services.AddScoped<EmailHandler>();
-builder.Services.AddLogging();
+builder.Services.AddScoped<PushHandler>();
 builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<NotificationService>();
-builder.Services.AddHostedService<KafkaConsumerService<EmailHandler>>();
+builder.Services.AddLogging();
+builder.Services.AddHostedService<KafkaConsumerService<PushHandler>>();
 
 var app = builder.Build();
 app.Run();

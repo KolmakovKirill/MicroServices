@@ -8,6 +8,6 @@ public class NotificationCreateDTO
     [MaxLength(500)]
     public String Body { get; set; } = null!;
     [Required]
-    public NotificationType Type { get; set; } 
-    public List<IFormFile> Files { get; set; } = new List<IFormFile>();
+    public NotificationType Type { get; set; }
+    public List<IFormFile>? Files { get; set; }
 }

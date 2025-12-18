@@ -43,6 +43,8 @@ public class GatewayController : ControllerBase
                 Username = userDTO.Username,
                 Email = userDTO.Email,
                 PhoneNumber = userDTO.PhoneNumber,
+                DeviceToken = userDTO.DeviceToken,
+                MessengerId = userDTO.MessengerId,
             };
             var createdUser = await _userService.AddAsync(user);
             return CreatedAtAction(nameof(GetUser), new { userId = createdUser.Id }, createdUser);
@@ -74,7 +76,7 @@ public class GatewayController : ControllerBase
 
 
     [HttpPost("{userId}/notificate")]
-    public async Task<ActionResult<NotificationResponseDTO>> NotificateUser(long userId, [FromForm] NotificationCreateDTO notificationDTO)
+    public async Task<ActionResult<NotificationResponseDTO>> NotificateUser(long userId, [FromBody] NotificationCreateDTO notificationDTO)
     {
         var foundUser = await _userService.FindAsync(userId);
         if (foundUser == null) return NotFound();
@@ -91,10 +93,13 @@ public class GatewayController : ControllerBase
         await _notificationService.AddAsync(notification);
 
         var medias = new List<Media>();
-        foreach (var media in notificationDTO.Files)
+        if (notificationDTO.Files != null)
         {
-            var createdMedia = await _mediaService.AddAsync(media, notification);
-            medias.Add(createdMedia);
+            foreach (var media in notificationDTO.Files)
+            {
+                var createdMedia = await _mediaService.AddAsync(media, notification);
+                medias.Add(createdMedia);
+            }
         }
 
 

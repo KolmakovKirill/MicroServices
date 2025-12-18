@@ -30,7 +30,9 @@ public class NotificationService : IDatabaseService<Notification> // Range на 
     //     return entity;
     // }
 
-    public async Task<Notification?> FindAsync(long id) => await _context.Notifications.FirstOrDefaultAsync(m => m.Id == id);
+    public async Task<Notification?> FindAsync(long id) => await _context.Notifications
+        .Include(n => n.User)
+        .FirstOrDefaultAsync(m => m.Id == id);
 
     public async Task<List<Notification>> ListAsync() => await _context.Notifications.ToListAsync();
 
@@ -48,7 +50,7 @@ public class NotificationService : IDatabaseService<Notification> // Range на 
         if (found == null)
             return null;
         _context.Notifications.Update(entity);
-        _context.SaveChangesAsync();
+        await _context.SaveChangesAsync();
         return entity;
     }
 

@@ -51,15 +51,112 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     volumes:
       - kafka_data:/var/lib/kafka/data
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "5000:8080"
+    depends_on:
+      - db
+      - kafka
+      - minio
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=gateway-sender
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+    volumes:
+      - ./Gateway/appsettings.json:/app/appsettings.json
+      - ./Gateway/appsettings.Development.json:/app/appsettings.Development.json
+
+  emailsender:
+    build:
+      context: .
+      dockerfile: EmailSender/Dockerfile
+    container_name: emailsender
+    ports:
+      - "5001:8080"
+    depends_on:
+      - db
+      - kafka
+      - minio
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=email-sender
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+
+  smssender:
+    build:
+      context: .
+      dockerfile: SmsSender/Dockerfile
+    container_name: smssender
+    ports:
+      - "5002:8080"
+    depends_on:
+      - db
+      - kafka
+      - minio
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=sms-sender
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+    volumes:
+      - ./SmsSender/appsettings.json:/app/appsettings.json
+      - ./SmsSender/appsettings.Development.json:/app/appsettings.Development.json
+
+  pushsender:
+    build:
+      context: .
+      dockerfile: PushSender/Dockerfile
+    container_name: pushsender
+    ports:
+      - "5003:8080"
+    depends_on:
+      - db
+      - kafka
+      - minio
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=push-sender
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+    volumes:
+      - ./PushSender/appsettings.json:/app/appsettings.json
+      - ./PushSender/appsettings.Development.json:/app/appsettings.Development.json
+
+  messengersender:
+    build:
+      context: .
+      dockerfile: MessengerSender/Dockerfile
+    container_name: messengersender
+    ports:
+      - "5004:8080"
+    depends_on:
+      - db
+      - kafka
+      - minio
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=messenger-sender
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+    volumes:
+      - ./MessengerSender/appsettings.json:/app/appsettings.json
+      - ./MessengerSender/appsettings.Development.json:/app/appsettings.Development.json
 
 volumes:
   pg_data:

@@ -54,7 +54,7 @@ public class UserService : IDatabaseService<User> // Range на всяйкий �
         if (found == null)
             return null;
         _context.Users.Update(entity);
-        _context.SaveChangesAsync();
+        await _context.SaveChangesAsync();
         return entity;
     }
 }

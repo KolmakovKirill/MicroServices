@@ -4,11 +4,13 @@ using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMinio(configureClient => configureClient
-                                                .WithEndpoint("localhost:9010")
+                                                .WithEndpoint("minio:9000")
                                                 .WithCredentials("miniouser", "admin123")
                                                 .WithSSL(false)
                                                 .Build());
@@ -16,7 +18,7 @@ builder.Services.AddMinio(configureClient => configureClient
 builder.Services.AddDbContext<ServerDbContext>(options =>
 {
     options.UseNpgsql(
-        "Host=localhost;Port=5332;Database=myapp;Username=postgres;Password=password",
+        builder.Configuration.GetConnectionString("DefaultConnection"),
         npgsql => npgsql.MigrationsAssembly("CommonShared")
     );
 });
@@ -25,10 +27,37 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<KafkaProducerService>();
 builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Notification Service API",
+        Version = "v1",
+        Description = "Распределенная система отправки уведомлений (Email, SMS, Push, Messenger) на основе микросервисов с использованием Kafka для асинхронной обработки",
+        Contact = new OpenApiContact
+        {
+            Name = "Notification Service Team",
+            Email = "support@notificationservice.com"
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT License",
+            Url = new Uri("https://opensource.org/licenses/MIT")
+        }
+    });
+
+    // Добавляем XML комментарии если они есть
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
-await KafkaTopicInitializer.EnsureTopicsAsync(builder.Configuration);
 
 var app = builder.Build();
 app.UseSwagger();
