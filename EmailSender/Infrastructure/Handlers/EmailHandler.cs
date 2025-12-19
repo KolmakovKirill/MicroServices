@@ -2,6 +2,7 @@ using CommonShared.Core.Domain;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Handlers;
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using MimeKit;
 using Microsoft.Extensions.Logging;
 
@@ -62,8 +63,7 @@ public class EmailHandler : Handler
 
         if (string.IsNullOrEmpty(smtpUser) || string.IsNullOrEmpty(smtpPassword))
         {
-            await SendMockEmailAsync(notification, recipientEmail, smtpSettings, cancellationToken);
-            return;
+            throw new InvalidOperationException("SMTP credentials are required for email notifications. Please configure SmtpUser and SmtpPassword in EmailSettings.");
         }
 
         using var client = new SmtpClient();
@@ -72,9 +72,9 @@ public class EmailHandler : Handler
         {
             var smtpHost = smtpSettings["SmtpHost"] ?? "smtp.gmail.com";
             var smtpPort = int.Parse(smtpSettings["SmtpPort"] ?? "587");
-            var useSsl = bool.Parse(smtpSettings["UseSsl"] ?? "true");
 
-            await client.ConnectAsync(smtpHost, smtpPort, useSsl, cancellationToken);
+
+            await client.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.StartTls, cancellationToken);
 
             await client.AuthenticateAsync(smtpUser, smtpPassword, cancellationToken);
 

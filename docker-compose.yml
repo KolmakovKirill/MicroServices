@@ -97,6 +97,8 @@ services:
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=email-sender
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+      - EmailSettings__SmtpUser=""
+      - EmailSettings__SmtpPassword=""
 
   smssender:
     build:

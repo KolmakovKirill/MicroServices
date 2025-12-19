@@ -2,6 +2,7 @@ using CommonShared.Core.Domain;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
 using CommonShared.Core.Domain.DataTransferObjects;
+using CommonShared.Infrastructure.Messaging.Models;
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -103,7 +104,7 @@ public class GatewayController : ControllerBase
         }
 
 
-        await _producerService.SendAsync("notifications", notification.Id);
+        await _producerService.SendAsync("notifications", notification.Id, notification.Type);
         var dto = new NotificationResponseDTO(notification);
         return Ok(dto);
     }

@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  emailsender:
+    environment:
+      - EmailSettings__SmtpUser=kirkol823@gmail.com
+      - EmailSettings__SmtpPassword=yoke qabd ljaq uvki
