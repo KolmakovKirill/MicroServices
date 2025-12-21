@@ -8,26 +8,26 @@ services:
       - 5332:5432
     volumes:
       - pg_data:/var/lib/postgresql/data
-    
-  minio:  
+  
+  minio:
     image: minio/minio
     container_name: minio
-    restart: unless-stopped  
+    restart: unless-stopped
     ports:
       - 9010:9000
       - 9011:9001
     expose:
       - "9000"
-    volumes:  
-      - minio_storage:/data  
-    environment:  
-      - MINIO_ROOT_USER=miniouser  
+    volumes:
+      - minio_storage:/data
+    environment:
+      - MINIO_ROOT_USER=miniouser
       - MINIO_ROOT_PASSWORD=admin123
-    command: server /data --console-address ":9001"  
-    healthcheck:  
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]  
-      interval: 30s  
-      timeout: 20s  
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
       retries: 3
     # profiles:
     #   - donotstart
@@ -58,6 +58,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
 
@@ -76,6 +77,10 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=gateway-sender
+      - Kafka__Topics__Sms=notifications.sms
+      - Kafka__Topics__Email=notifications.email
+      - Kafka__Topics__Push=notifications.push
+      - Kafka__Topics__Messenger=notifications.messenger
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
     volumes:
       - ./Gateway/appsettings.json:/app/appsettings.json
@@ -96,9 +101,16 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=email-sender
+      - Kafka__Topic=notifications.email
+      - Kafka__MaxParallel=8
+      - Kafka__EnableAutoCommit=true
+      - Kafka__AutoOffsetReset=Earliest
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
-      - EmailSettings__SmtpUser=""
-      - EmailSettings__SmtpPassword=""
+      - EmailSettings__SmtpHost=smtp.gmail.com
+      - EmailSettings__SmtpPort=587
+      - EmailSettings__UseSsl=true
+      - EmailSettings__SmtpUser=mock_user
+      - EmailSettings__SmtpPassword=mock_password
 
   smssender:
     build:
@@ -115,7 +127,20 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=sms-sender
+      - Kafka__Topic=notifications.sms
+      - Kafka__MaxParallel=8
+      - Kafka__EnableAutoCommit=true
+      - Kafka__AutoOffsetReset=Earliest
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+      - SmsSettings__Provider=Mock
+      - SmsSettings__UseMock=true
+      - SmsSettings__Twilio__AccountSid=
+      - SmsSettings__Twilio__AuthToken=
+      - SmsSettings__Twilio__FromNumber=
+      - SmsSettings__AwsSns__Region=eu-west-1
+      - SmsSettings__AwsSns__AccessKeyId=
+      - SmsSettings__AwsSns__SecretAccessKey=
+      - SmsSettings__AwsSns__SenderId=
     volumes:
       - ./SmsSender/appsettings.json:/app/appsettings.json
       - ./SmsSender/appsettings.Development.json:/app/appsettings.Development.json
@@ -133,9 +158,20 @@ services:
       - minio
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=push-sender
+      - Kafka__Topic=notifications.push
+      - Kafka__MaxParallel=8
+      - Kafka__EnableAutoCommit=true
+      - Kafka__AutoOffsetReset=Earliest
+
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+
+      - FirebaseSettings__UseMock=false
+      - FirebaseSettings__CredentialsPath=firebase-credentials.json
+      - FirebaseSettings__AppName=PushSender
+    
     volumes:
       - ./PushSender/appsettings.json:/app/appsettings.json
       - ./PushSender/appsettings.Development.json:/app/appsettings.Development.json
@@ -153,9 +189,23 @@ services:
       - minio
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+    
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=messenger-sender
+      - Kafka__Topic=notifications.messenger
+      - Kafka__MaxParallel=8
+      - Kafka__EnableAutoCommit=true
+      - Kafka__AutoOffsetReset=Earliest
+    
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+    
+      - MessengerSettings__Provider=Mock
+    
+      - MessengerSettings__Telegram__BotToken=
+      - MessengerSettings__WhatsApp__AccessToken=
+      - MessengerSettings__WhatsApp__PhoneNumberId=
+      - MessengerSettings__WhatsApp__TemplateName=
+      - MessengerSettings__WhatsApp__LanguageCode=en_US
     volumes:
       - ./MessengerSender/appsettings.json:/app/appsettings.json
       - ./MessengerSender/appsettings.Development.json:/app/appsettings.Development.json

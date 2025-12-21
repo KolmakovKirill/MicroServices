@@ -1,0 +1,87 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  emailsender:
+    build:
+      context: "/home/simofono/Development/C#/Microservices.Course"
+      dockerfile: "EmailSender/Dockerfile"
+      target: "build"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/EmailSender.dll"
+    environment: {}
+    image: "emailsender:dev"
+    ports: []
+    volumes:
+    - "/home/simofono/Development/C#/Microservices.Course/EmailSender:/app:rw"
+    - "/home/simofono/Development/C#/Microservices.Course:/src:rw"
+    - "/home/simofono/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"
+  gateway:
+    build:
+      context: "/home/simofono/Development/C#/Microservices.Course"
+      dockerfile: "Gateway/Dockerfile"
+      target: "build"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/microservices_project.dll"
+    environment: {}
+    image: "microservices_project:dev"
+    ports: []
+    volumes:
+    - "/home/simofono/Development/C#/Microservices.Course/Gateway:/app:rw"
+    - "/home/simofono/Development/C#/Microservices.Course:/src:rw"
+    - "/home/simofono/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"
+  messengersender:
+    build:
+      context: "/home/simofono/Development/C#/Microservices.Course"
+      dockerfile: "MessengerSender/Dockerfile"
+      target: "build"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/MessengerSender.dll"
+    environment: {}
+    image: "messengersender:dev"
+    ports: []
+    volumes:
+    - "/home/simofono/Development/C#/Microservices.Course/MessengerSender:/app:rw"
+    - "/home/simofono/Development/C#/Microservices.Course:/src:rw"
+    - "/home/simofono/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"
+  pushsender:
+    build:
+      context: "/home/simofono/Development/C#/Microservices.Course"
+      dockerfile: "PushSender/Dockerfile"
+      target: "build"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/PushSender.dll"
+    environment: {}
+    image: "pushsender:dev"
+    ports: []
+    volumes:
+    - "/home/simofono/Development/C#/Microservices.Course/PushSender:/app:rw"
+    - "/home/simofono/Development/C#/Microservices.Course:/src:rw"
+    - "/home/simofono/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"
+  smssender:
+    build:
+      context: "/home/simofono/Development/C#/Microservices.Course"
+      dockerfile: "SmsSender/Dockerfile"
+      target: "build"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/SmsSender.dll"
+    environment: {}
+    image: "smssender:dev"
+    ports: []
+    volumes:
+    - "/home/simofono/Development/C#/Microservices.Course/SmsSender:/app:rw"
+    - "/home/simofono/Development/C#/Microservices.Course:/src:rw"
+    - "/home/simofono/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"

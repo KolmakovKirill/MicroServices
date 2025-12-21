@@ -1,27 +1,35 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using CommonShared.Core.Domain;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Handlers;
-using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Text.Json;
+using MessengerSender.Configuration;
+using Microsoft.Extensions.Options;
 
-public class MessengerHandler : Handler
+namespace MessengerSender.Infrastructure.Handlers;
+
+public class MessengerNotificationHandler : NotificationHandler
 {
     private readonly NotificationService _notificationService;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<MessengerHandler> _logger;
+    private readonly ILogger<MessengerNotificationHandler> _logger;
     private readonly HttpClient _httpClient;
+    private readonly MessengerSettings _messengerSettings;
 
-    public MessengerHandler(NotificationService notificationService, IConfiguration configuration, ILogger<MessengerHandler> logger, HttpClient httpClient)
+    public MessengerNotificationHandler(
+        NotificationService notificationService,
+        ILogger<MessengerNotificationHandler> logger,
+        HttpClient httpClient,
+        IOptions<MessengerSettings> messengerSettings)
     {
         Type = NotificationType.Messenger;
         _notificationService = notificationService;
-        _configuration = configuration;
         _logger = logger;
         _httpClient = httpClient;
+        _messengerSettings = messengerSettings.Value;
     }
 
-    public override async void HandleTask(Notification notification, CancellationToken cancellationToken)
+    public override async Task HandleTask(Notification notification, CancellationToken cancellationToken)
     {
         try
         {
@@ -56,26 +64,23 @@ public class MessengerHandler : Handler
 
     private async Task SendMessengerNotificationAsync(Notification notification, string messengerId, CancellationToken cancellationToken)
     {
-        var messengerSettings = _configuration.GetSection("MessengerSettings");
-        var provider = messengerSettings["Provider"] ?? "telegram"; 
-
-        switch (provider.ToLower())
+        switch (_messengerSettings.Provider)
         {
-            case "telegram":
-                await SendViaTelegramAsync(notification, messengerId, messengerSettings, cancellationToken);
+            case MessengerProvider.Telegram:
+                await SendViaTelegramAsync(notification, messengerId, cancellationToken);
                 break;
-            case "whatsapp":
-                await SendViaWhatsAppAsync(notification, messengerId, messengerSettings, cancellationToken);
+            case MessengerProvider.WhatsApp:
+                await SendViaWhatsAppAsync(notification, messengerId, cancellationToken);
                 break;
             default:
-                await SendMockMessengerNotificationAsync(notification, messengerId, messengerSettings, cancellationToken);
+                await SendMockMessengerNotificationAsync(notification, messengerId, cancellationToken);
                 break;
         }
     }
 
-    private async Task SendViaTelegramAsync(Notification notification, string chatId, IConfigurationSection messengerSettings, CancellationToken cancellationToken)
+    private async Task SendViaTelegramAsync(Notification notification, string chatId, CancellationToken cancellationToken)
     {
-        var botToken = messengerSettings["BotToken"];
+        var botToken = _messengerSettings.Telegram.BotToken;
 
         if (string.IsNullOrEmpty(botToken))
         {
@@ -109,13 +114,50 @@ public class MessengerHandler : Handler
         _logger.LogInformation("Telegram message sent successfully. Message ID: {MessageId}", telegramResponse.result?.message_id);
     }
 
-    private async Task SendViaWhatsAppAsync(Notification notification, string recipientId, IConfigurationSection messengerSettings, CancellationToken cancellationToken)
+    private async Task SendViaWhatsAppAsync(Notification notification, string recipientId, CancellationToken cancellationToken)
     {
-        await Task.Delay(400, cancellationToken);
-        _logger.LogInformation("WhatsApp message would be sent to {RecipientId}", recipientId);
+        var wa = _messengerSettings.WhatsApp;
+
+        var url = $"https://graph.facebook.com/v19.0/{wa.PhoneNumberId}/messages";
+
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            to = recipientId,
+            type = "template",
+            template = new
+            {
+                name = wa.TemplateName,
+                language = new { code = wa.LanguageCode },
+                components = new[]
+                {
+                    new
+                    {
+                        type = "body",
+                        parameters = new object[]
+                        {
+                            new { type = "text", text = notification.Subject ?? "Notification" },
+                            new { type = "text", text = notification.Body ?? "" }
+                        }
+                    }
+                }
+            }
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", wa.AccessToken);
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"WhatsApp API error: {(int)response.StatusCode} {responseBody}");
+
+        _logger.LogInformation("WhatsApp message sent to {RecipientId}. Response: {Response}", recipientId, responseBody);
     }
 
-    private async Task SendMockMessengerNotificationAsync(Notification notification, string messengerId, IConfigurationSection messengerSettings, CancellationToken cancellationToken)
+    private async Task SendMockMessengerNotificationAsync(Notification notification, string messengerId, CancellationToken cancellationToken)
     {
         await Task.Delay(250, cancellationToken);
 

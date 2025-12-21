@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Library</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,5 +24,6 @@
   <ItemGroup>
     <Content Remove="appsettings*.json" />
     <None Remove="appsettings*.json" />
+    <None Remove="Properties\launchSettings.json" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@ using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
 using CommonShared.Core.Domain.DataTransferObjects;
 using CommonShared.Infrastructure.Messaging.Models;
+using microservices_project.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -15,13 +16,15 @@ public class GatewayController : ControllerBase
     private readonly UserService _userService;
     private readonly KafkaProducerService _producerService;
     private readonly NotificationService _notificationService;
+    private readonly NotificationHelper _notificationHelper;
 
-    public GatewayController(MediaService mediaService, UserService userService, KafkaProducerService producerService, NotificationService notificationService)
+    public GatewayController(MediaService mediaService, UserService userService, KafkaProducerService producerService, NotificationService notificationService, NotificationHelper notificationHelper)
     {
         _mediaService = mediaService;
         _userService = userService;
         _producerService = producerService;
         _notificationService = notificationService;
+        _notificationHelper = notificationHelper;
     }
 
     //TODO Переделать возвращения пользователя в возвращение DTO
@@ -103,8 +106,8 @@ public class GatewayController : ControllerBase
             }
         }
 
-
-        await _producerService.SendAsync("notifications", notification.Id, notification.Type);
+        var topic = _notificationHelper.ResolveTopic(notification.Type);
+        await _producerService.SendAsync(topic, notification.Id, notification.Type);
         var dto = new NotificationResponseDTO(notification);
         return Ok(dto);
     }

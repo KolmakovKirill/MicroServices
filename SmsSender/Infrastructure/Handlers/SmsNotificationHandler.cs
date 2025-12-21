@@ -1,27 +1,32 @@
+using Amazon;
+using Amazon.Runtime;
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
 using CommonShared.Core.Domain;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Handlers;
-using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Text.Json;
+using Microsoft.Extensions.Options;
+using SmsSender.Configuration;
 
-public class SmsHandler : Handler
+namespace SmsSender.Infrastructure.Handlers;
+
+public class SmsNotificationHandler : NotificationHandler
 {
     private readonly NotificationService _notificationService;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<SmsHandler> _logger;
+    private readonly ILogger<SmsNotificationHandler> _logger;
     private readonly HttpClient _httpClient;
+    private readonly SmsSettings _smsSettings;
 
-    public SmsHandler(NotificationService notificationService, IConfiguration configuration, ILogger<SmsHandler> logger, HttpClient httpClient)
+    public SmsNotificationHandler(NotificationService notificationService, ILogger<SmsNotificationHandler> logger, HttpClient httpClient, IOptions<SmsSettings> smsSettings)
     {
         Type = NotificationType.SMS;
         _notificationService = notificationService;
-        _configuration = configuration;
         _logger = logger;
         _httpClient = httpClient;
+        _smsSettings = smsSettings.Value;
     }
 
-    public override async void HandleTask(Notification notification, CancellationToken cancellationToken)
+    public override async Task HandleTask(Notification notification, CancellationToken cancellationToken)
     {
         try
         {
@@ -56,28 +61,25 @@ public class SmsHandler : Handler
 
     private async Task SendSmsAsync(Notification notification, string recipientPhone, CancellationToken cancellationToken)
     {
-        var smsSettings = _configuration.GetSection("SmsSettings");
-        var provider = smsSettings["Provider"] ?? "twilio";
-
-        switch (provider.ToLower())
+        switch (_smsSettings.Provider)
         {
-            case "twilio":
-                await SendViaTwilioAsync(notification, recipientPhone, smsSettings, cancellationToken);
+            case SmsProvider.Twilio:
+                await SendViaTwilioAsync(notification, recipientPhone, cancellationToken);
                 break;
-            case "aws-sns":
-                await SendViaAwsSnsAsync(notification, recipientPhone, smsSettings, cancellationToken);
+            case SmsProvider.AwsSns:
+                await SendViaAwsSnsAsync(notification, recipientPhone, cancellationToken);
                 break;
             default:
-                await SendMockSmsAsync(notification, recipientPhone, smsSettings, cancellationToken);
+                await SendMockSmsAsync(notification, recipientPhone, cancellationToken);
                 break;
         }
     }
 
-    private async Task SendViaTwilioAsync(Notification notification, string recipientPhone, IConfigurationSection smsSettings, CancellationToken cancellationToken)
+    private async Task SendViaTwilioAsync(Notification notification, string recipientPhone, CancellationToken cancellationToken)
     {
-        var accountSid = smsSettings["AccountSid"];
-        var authToken = smsSettings["AuthToken"];
-        var fromNumber = smsSettings["FromNumber"];
+        var accountSid = _smsSettings.Twilio.AccountSid;
+        var authToken = _smsSettings.Twilio.AuthToken;
+        var fromNumber = _smsSettings.Twilio.FromNumber;
 
         if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken) || string.IsNullOrEmpty(fromNumber))
         {
@@ -108,14 +110,53 @@ public class SmsHandler : Handler
         _logger.LogInformation("Twilio SMS sent. Response: {Response}", responseContent);
     }
 
-    private async Task SendViaAwsSnsAsync(Notification notification, string recipientPhone, IConfigurationSection smsSettings, CancellationToken cancellationToken)
+    private async Task SendViaAwsSnsAsync(
+        Notification notification,
+        string recipientPhone,
+        CancellationToken cancellationToken)
     {
+        var aws = _smsSettings.AwsSns;
 
-        await Task.Delay(500, cancellationToken);
-        _logger.LogInformation("AWS SNS SMS would be sent to {PhoneNumber}", recipientPhone);
+        var credentials = new BasicAWSCredentials(
+            aws.AccessKeyId,
+            aws.SecretAccessKey);
+
+        using var client = new AmazonSimpleNotificationServiceClient(
+            credentials,
+            RegionEndpoint.GetBySystemName(aws.Region));
+
+        var request = new PublishRequest
+        {
+            PhoneNumber = recipientPhone,
+            Message = notification.Body,
+            MessageAttributes = new Dictionary<string, MessageAttributeValue>
+            {
+                ["AWS.SNS.SMS.SMSType"] = new()
+                {
+                    DataType = "String",
+                    StringValue = "Transactional"
+                }
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(aws.SenderId))
+        {
+            request.MessageAttributes["AWS.SNS.SMS.SenderID"] =
+                new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = aws.SenderId
+                };
+        }
+
+        var response = await client.PublishAsync(request, cancellationToken);
+
+        _logger.LogInformation(
+            "AWS SNS SMS sent. MessageId={MessageId}",
+            response.MessageId);
     }
 
-    private async Task SendMockSmsAsync(Notification notification, string recipientPhone, IConfigurationSection smsSettings, CancellationToken cancellationToken)
+    private async Task SendMockSmsAsync(Notification notification, string recipientPhone, CancellationToken cancellationToken)
     {
         await Task.Delay(200, cancellationToken);
 

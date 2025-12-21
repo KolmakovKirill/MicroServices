@@ -1,8 +1,12 @@
+using CommonShared.Configuration;
 using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using MessengerSender.Configuration;
+using MessengerSender.Infrastructure.Handlers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,11 +24,19 @@ builder.Services.AddDbContext<ServerDbContext>(options =>
     );
 });
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<MessengerHandler>();
+builder.Services.AddScoped<MessengerNotificationHandler>();
 builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddLogging();
-builder.Services.AddHostedService<KafkaConsumerService<MessengerHandler>>();
+builder.Services.AddHostedService<KafkaConsumerService<MessengerNotificationHandler>>();
+builder.Services.AddKafkaConsumerSettings(builder.Configuration, "Kafka");
+
+builder.Services.AddSingleton<IValidateOptions<MessengerSettings>, MessengerSettingsValidator>();
+
+builder.Services
+    .AddOptions<MessengerSettings>()
+    .Bind(builder.Configuration.GetSection("MessengerSettings"))
+    .ValidateOnStart();
 
 var app = builder.Build();
 app.Run();

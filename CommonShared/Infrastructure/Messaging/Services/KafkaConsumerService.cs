@@ -1,92 +1,121 @@
-using System.Reactive;
+using CommonShared.Configuration;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Handlers;
 using CommonShared.Infrastructure.Messaging.Models;
 using CommonShared.Infrastructure.Messaging.Serializers;
 using Confluent.Kafka;
+using Microsoft.Extensions.Options;
 
 namespace CommonShared.Infrastructure.Messaging.Services;
 
-public class KafkaConsumerService<HandlerClass> : BackgroundService 
-    where HandlerClass : Handler
+public class KafkaConsumerService<THandlerClass> : BackgroundService
+    where THandlerClass : NotificationHandler
 {
-    private readonly ILogger<KafkaConsumerService<HandlerClass>> _logger;
-    private readonly string _topic = "notifications";
+    private readonly ILogger<KafkaConsumerService<THandlerClass>> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IConfiguration _config;
     private IConsumer<string, NotificationMessage>? _consumer;
+    private readonly KafkaConsumerSettings _settings;
 
-    public KafkaConsumerService(IConfiguration config,
-                                ILogger<KafkaConsumerService<HandlerClass>> logger,
-                                IServiceProvider serviceProvider)
+    public KafkaConsumerService(
+        ILogger<KafkaConsumerService<THandlerClass>> logger,
+        IServiceProvider serviceProvider,
+        IOptions<KafkaConsumerSettings> consumerSettings)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
-        _config = config;
+        _settings = consumerSettings.Value;
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return Task.Run(async () =>
+        _logger.LogInformation(
+            "Initializing Kafka consumer with BootstrapServers: {BootstrapServers}, GroupId: {GroupId}, Topic: {Topic}, MaxParallel: {MaxParallel}",
+            _settings.BootstrapServers, _settings.GroupId, _settings.Topic, _settings.MaxParallel);
+
+        var consumerConfig = new ConsumerConfig
         {
-            var bootstrapServers = _config["Kafka:BootstrapServers"];
-            var groupId = _config["Kafka:GroupId"];
+            BootstrapServers = _settings.BootstrapServers,
+            GroupId = _settings.GroupId,
+            AutoOffsetReset = _settings.AutoOffsetReset,
+            EnableAutoCommit = _settings.EnableAutoCommit
+        };
 
-            _logger.LogInformation("Initializing Kafka consumer with BootstrapServers: {BootstrapServers}, GroupId: {GroupId}", 
-                bootstrapServers, groupId);
+        _consumer = new ConsumerBuilder<string, NotificationMessage>(consumerConfig)
+            .SetValueDeserializer(new JsonDeserializer<NotificationMessage>())
+            .Build();
 
-            var consumerConfig = new ConsumerConfig
+        _consumer.Subscribe(_settings.Topic);
+
+        using var semaphore = new SemaphoreSlim(_settings.MaxParallel, _settings.MaxParallel);
+        var inFlight = new List<Task>(capacity: _settings.MaxParallel * 2);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
             {
-                BootstrapServers = bootstrapServers,
-                GroupId = groupId,
-                AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnableAutoCommit = true
-            };
+                if (_consumer == null) break;
 
-            _consumer = new ConsumerBuilder<string, NotificationMessage>(consumerConfig)
-                .SetValueDeserializer(new JsonDeserializer<NotificationMessage>())
-                .Build();
-            
-            _consumer.Subscribe(_topic);
+                var cr = _consumer.Consume(stoppingToken);
+                var msg = cr.Message.Value;
 
-            _logger.LogInformation("Kafka consumer initialized for topic {Topic}", _topic);
+                await semaphore.WaitAsync(stoppingToken);
 
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                try
+                var task = Task.Run(async () =>
                 {
-                    if (_consumer == null) break;
-
-                    var cr = _consumer.Consume(stoppingToken);
-                    var notificationMessage = cr.Message.Value;
-                    var notificationId = notificationMessage.NotificationId;
-                    var notificationType = notificationMessage.NotificationType;
-
-                    var scope = _serviceProvider.CreateScope();
-
-                    var handler = scope.ServiceProvider.GetRequiredService<HandlerClass>();
-                    if (handler.Type.ToString() == notificationType)
+                    try
                     {
-                        var _notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
-                        var notification = await _notificationService.FindAsync(notificationId);
+                        using var scope = _serviceProvider.CreateScope();
+
+                        var handler = scope.ServiceProvider.GetRequiredService<THandlerClass>();
+
+                        var notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
+                        var notification = await notificationService.FindAsync(msg.NotificationId);
+
                         if (notification == null)
                         {
-                            _logger.LogWarning("Не обнаружено уведомления с таким ID: {NotificationId}", notificationId);
+                            _logger.LogWarning("Не обнаружено уведомления с таким ID: {NotificationId}", msg.NotificationId);
                             return;
                         }
-                        handler.HandleTask(notification, stoppingToken);
+
+                        await handler.HandleTask(notification, stoppingToken);
+
                     }
-                }
-                catch (OperationCanceledException)
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error while processing Kafka message");
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }, stoppingToken);
+
+                inFlight.Add(task);
+
+                for (var i = inFlight.Count - 1; i >= 0; i--)
                 {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error while consuming Kafka message");
+                    if (inFlight[i].IsCompleted)
+                        inFlight.RemoveAt(i);
                 }
             }
-        }, stoppingToken);
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while consuming Kafka message");
+            }
+        }
+
+        try
+        {
+            await Task.WhenAll(inFlight);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while awaiting in-flight tasks");
+        }
     }
 
     public override void Dispose()

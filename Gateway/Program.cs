@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using Microsoft.OpenApi.Models;
 using System.IO;
+using microservices_project.Configuration;
+using microservices_project.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +28,11 @@ builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<KafkaProducerService>();
+builder.Services.AddSingleton<NotificationHelper>();
 builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+builder.Services.AddOptions<NotificationTopicsSettings>()
+    .Bind(builder.Configuration.GetSection("Kafka:Topics"));
 
 builder.Services.AddSwaggerGen(options =>
 {

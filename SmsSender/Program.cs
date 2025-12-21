@@ -1,8 +1,12 @@
+using CommonShared.Configuration;
 using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SmsSender.Configuration;
+using SmsSender.Infrastructure.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,11 +24,20 @@ builder.Services.AddDbContext<ServerDbContext>(options =>
     );
 });
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<SmsHandler>();
+builder.Services.AddScoped<SmsNotificationHandler>();
 builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddLogging();
-builder.Services.AddHostedService<KafkaConsumerService<SmsHandler>>();
+builder.Services.AddHostedService<KafkaConsumerService<SmsNotificationHandler>>();
+builder.Services.AddKafkaConsumerSettings(builder.Configuration, "Kafka");
+
+builder.Services.AddSingleton<IValidateOptions<SmsSettings>, SmsSettingsValidator>();
+
+builder.Services
+    .AddOptions<SmsSettings>()
+    .Bind(builder.Configuration.GetSection("SmsSettings"))
+    .ValidateOnStart();
+
 
 var app = builder.Build();
 app.Run();

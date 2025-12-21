@@ -1,8 +1,12 @@
+using CommonShared.Configuration;
 using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using EmailSender.Configuration;
+using EmailSender.Infrastructure.Handlers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,11 +23,19 @@ builder.Services.AddDbContext<ServerDbContext>(options =>
         npgsql => npgsql.MigrationsAssembly("CommonShared")
     );
 });
-builder.Services.AddScoped<EmailHandler>();
+builder.Services.AddScoped<EmailNotificationHandler>();
 builder.Services.AddLogging();
 builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<NotificationService>();
-builder.Services.AddHostedService<KafkaConsumerService<EmailHandler>>();
+builder.Services.AddHostedService<KafkaConsumerService<EmailNotificationHandler>>();
+builder.Services.AddKafkaConsumerSettings(builder.Configuration, "Kafka");
+
+builder.Services.AddSingleton<IValidateOptions<EmailSettings>, EmailSettingsValidator>();
+
+builder.Services
+    .AddOptions<EmailSettings>()
+    .Bind(builder.Configuration.GetSection("EmailSettings"))
+    .ValidateOnStart();
 
 var app = builder.Build();
 app.Run();
