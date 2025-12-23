@@ -27,7 +27,6 @@ public class GatewayController : ControllerBase
         _notificationHelper = notificationHelper;
     }
 
-    //TODO Переделать возвращения пользователя в возвращение DTO
 
     [HttpGet("")]
     public async Task<ActionResult<UserResponseDTO>> ListUsers()
@@ -80,7 +79,7 @@ public class GatewayController : ControllerBase
 
 
     [HttpPost("{userId}/notificate")]
-    public async Task<ActionResult<NotificationResponseDTO>> NotificateUser(long userId, [FromBody] NotificationCreateDTO notificationDTO)
+    public async Task<ActionResult<NotificationResponseDTO>> NotificateUser(long userId, [FromForm] NotificationCreateDTO notificationDTO)
     {
         var foundUser = await _userService.FindAsync(userId);
         if (foundUser == null) return NotFound();
@@ -110,6 +109,48 @@ public class GatewayController : ControllerBase
         await _producerService.SendAsync(topic, notification.Id, notification.Type);
         var dto = new NotificationResponseDTO(notification);
         return Ok(dto);
+    }
+
+    [HttpPost("{userId}/notificate_all_channels")]
+    public async Task<ActionResult<List<NotificationResponseDTO>>> NotificateUserAllChannel(long userId, [FromForm] AllNotificationCreateDTO notificationCreateDTO)
+    {
+        
+        var foundUser = await _userService.FindAsync(userId);
+        if (foundUser == null) return NotFound();
+
+        var result = new List<NotificationResponseDTO>();
+
+        foreach (NotificationType type in Enum.GetValues(typeof(NotificationType)))
+        {  
+            var notification = new Notification
+            {
+                Subject = "я не знаю что это, и что сюда писать",
+                Body = notificationCreateDTO.Body,
+                Type = type,
+                Status = NotificationStatus.Pending,
+                UserId = userId,
+                User = foundUser
+            };
+            await _notificationService.AddAsync(notification);
+
+                    var medias = new List<Media>();
+            if (notificationCreateDTO.Files != null)
+            {
+                foreach (var media in notificationCreateDTO.Files)
+                {
+                    var createdMedia = await _mediaService.AddAsync(media, notification);
+                    medias.Add(createdMedia);
+                }
+            }
+            
+
+            var topic = _notificationHelper.ResolveTopic(notification.Type);
+            await _producerService.SendAsync(topic, notification.Id, notification.Type);
+
+            result.Add(new NotificationResponseDTO(notification));
+        }
+
+        return Ok(result);
     }
 }
 
