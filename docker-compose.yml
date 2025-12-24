@@ -59,10 +59,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    volumes:
-      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: /bin/kafka-topics --bootstrap-server localhost:9092 --list | grep -E 'notifications' &> /dev/null
+      test: /bin/kafka-topics --bootstrap-server localhost:9092 --list | grep -E 'notifications.email|notifications.sms|notifications.push|notifications.messenger' &> /dev/null
       start_period: 60s
       interval: 10s
       timeout: 5s
@@ -79,7 +77,10 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --list
 
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.email --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.sms --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.push --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.messenger --replication-factor 1 --partitions 1
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:9092 --list"
@@ -92,9 +93,10 @@ services:
     ports:
       - "5000:8080"
     depends_on:
-      - db
-      - kafka
-      - minio
+      db:
+      kafka:
+        condition: service_healthy
+      minio:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
@@ -116,9 +118,7 @@ services:
     ports:
       - "5001:8080"
     depends_on:
-      - db
-      - kafka
-      - minio
+      - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
@@ -142,9 +142,7 @@ services:
     ports:
       - "5002:8080"
     depends_on:
-      - db
-      - kafka
-      - minio
+      - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
@@ -175,9 +173,7 @@ services:
     ports:
       - "5003:8080"
     depends_on:
-      - db
-      - kafka
-      - minio
+      - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
 
@@ -206,9 +202,7 @@ services:
     ports:
       - "5004:8080"
     depends_on:
-      - db
-      - kafka
-      - minio
+      - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
     
@@ -235,4 +229,3 @@ services:
 volumes:
   pg_data:
   minio_storage:
-  kafka_data:
