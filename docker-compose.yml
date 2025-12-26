@@ -8,7 +8,7 @@ services:
       - 5332:5432
     volumes:
       - pg_data:/var/lib/postgresql/data
-  
+
   minio:
     image: minio/minio
     container_name: minio
@@ -29,8 +29,6 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    # profiles:
-    #   - donotstart
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
@@ -59,6 +57,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
       test: /bin/kafka-topics --bootstrap-server localhost:9092 --list | grep -E 'notifications.email|notifications.sms|notifications.push|notifications.messenger' &> /dev/null
       start_period: 60s
@@ -68,22 +68,21 @@ services:
 
   init-kafka:
     image: confluentinc/cp-kafka:7.6.0
+    container_name: init-kafka
     depends_on:
       - kafka
-    entrypoint: [ '/bin/sh', '-c' ]
+    entrypoint: [ "/bin/sh", "-c" ]
     command: |
       "
-      # blocks until kafka is reachable
       kafka-topics --bootstrap-server kafka:9092 --list
 
-      echo -e 'Creating kafka topics'
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.email --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.sms --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.push --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notifications.messenger --replication-factor 1 --partitions 1
 
-      echo -e 'Successfully created the following topics:'
-      kafka-topics --bootstrap-server kafka:9092 --list"
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
 
   gateway:
     build:
@@ -93,10 +92,10 @@ services:
     ports:
       - "5000:8080"
     depends_on:
-      db:
-      kafka:
-        condition: service_healthy
-      minio:
+      - db
+      - minio
+      - otel-collector
+      - kafka
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - Kafka__BootstrapServers=kafka:9092
@@ -106,6 +105,8 @@ services:
       - Kafka__Topics__Push=notifications.push
       - Kafka__Topics__Messenger=notifications.messenger
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
+      - OTEL_SERVICE_NAME=gateway
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     volumes:
       - ./Gateway/appsettings.json:/app/appsettings.json
       - ./Gateway/appsettings.Development.json:/app/appsettings.Development.json
@@ -118,6 +119,10 @@ services:
     ports:
       - "5001:8080"
     depends_on:
+      - db
+      - minio
+      - kafka
+      - otel-collector
       - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -133,6 +138,8 @@ services:
       - EmailSettings__UseSsl=true
       - EmailSettings__SmtpUser=mock_user
       - EmailSettings__SmtpPassword=mock_password
+      - OTEL_SERVICE_NAME=emailsender
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
 
   smssender:
     build:
@@ -142,6 +149,10 @@ services:
     ports:
       - "5002:8080"
     depends_on:
+      - db
+      - minio
+      - kafka
+      - otel-collector
       - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -161,6 +172,8 @@ services:
       - SmsSettings__AwsSns__AccessKeyId=
       - SmsSettings__AwsSns__SecretAccessKey=
       - SmsSettings__AwsSns__SenderId=
+      - OTEL_SERVICE_NAME=smssender
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     volumes:
       - ./SmsSender/appsettings.json:/app/appsettings.json
       - ./SmsSender/appsettings.Development.json:/app/appsettings.Development.json
@@ -173,23 +186,25 @@ services:
     ports:
       - "5003:8080"
     depends_on:
+      - db
+      - minio
+      - kafka
+      - otel-collector
       - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=push-sender
       - Kafka__Topic=notifications.push
       - Kafka__MaxParallel=8
       - Kafka__EnableAutoCommit=true
       - Kafka__AutoOffsetReset=Earliest
-
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
-
       - FirebaseSettings__UseMock=false
       - FirebaseSettings__CredentialsPath=firebase-credentials.json
       - FirebaseSettings__AppName=PushSender
-    
+      - OTEL_SERVICE_NAME=pushsender
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     volumes:
       - ./PushSender/appsettings.json:/app/appsettings.json
       - ./PushSender/appsettings.Development.json:/app/appsettings.Development.json
@@ -202,30 +217,97 @@ services:
     ports:
       - "5004:8080"
     depends_on:
+      - db
+      - minio
+      - kafka
+      - otel-collector
       - gateway
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-    
       - Kafka__BootstrapServers=kafka:9092
       - Kafka__GroupId=messenger-sender
       - Kafka__Topic=notifications.messenger
       - Kafka__MaxParallel=8
       - Kafka__EnableAutoCommit=true
       - Kafka__AutoOffsetReset=Earliest
-    
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=myapp;Username=postgres;Password=password
-    
       - MessengerSettings__Provider=Mock
-    
       - MessengerSettings__Telegram__BotToken=
       - MessengerSettings__WhatsApp__AccessToken=
       - MessengerSettings__WhatsApp__PhoneNumberId=
       - MessengerSettings__WhatsApp__TemplateName=
       - MessengerSettings__WhatsApp__LanguageCode=en_US
+      - OTEL_SERVICE_NAME=messengersender
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     volumes:
       - ./MessengerSender/appsettings.json:/app/appsettings.json
       - ./MessengerSender/appsettings.Development.json:/app/appsettings.Development.json
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - otel-collector
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    restart: unless-stopped
+    command: [ "-config.file=/etc/tempo/tempo.yml" ]
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/tmp/tempo
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: [ "--config=/etc/otelcol/config.yml" ]
+    ports:
+      - "4317:4317"
+      - "9464:9464"
+    volumes:
+      - ./observability/otelcol.yml:/etc/otelcol/config.yml:ro
+    depends_on:
+      - loki
+      - tempo
+
 volumes:
   pg_data:
   minio_storage:
+  kafka_data:
+  grafana_data:
+  loki_data:
+  tempo_data:

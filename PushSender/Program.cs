@@ -3,6 +3,7 @@ using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using CommonShared.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PushSender.Configuration;
@@ -38,6 +39,12 @@ builder.Services
     .AddOptions<FirebaseSettings>()
     .Bind(builder.Configuration.GetSection("FirebaseSettings"))
     .ValidateOnStart();
+
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "PushSender";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? throw new NullReferenceException("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+builder.Services
+    .AddCommonObservability(serviceName, otlpEndpoint);
 
 var app = builder.Build();
 app.Run();

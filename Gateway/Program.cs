@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using Microsoft.OpenApi.Models;
 using System.IO;
+using CommonShared.Observability;
 using microservices_project.Configuration;
 using microservices_project.Helpers;
 
@@ -64,6 +65,11 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "Gateway";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? throw new NullReferenceException("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+builder.Services
+    .AddCommonObservability(serviceName, otlpEndpoint);
 
 var app = builder.Build();
 app.UseSwagger();

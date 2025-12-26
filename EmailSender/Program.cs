@@ -3,6 +3,7 @@ using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using CommonShared.Observability;
 using EmailSender.Configuration;
 using EmailSender.Infrastructure.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,12 @@ builder.Services
     .AddOptions<EmailSettings>()
     .Bind(builder.Configuration.GetSection("EmailSettings"))
     .ValidateOnStart();
+
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "EmailSender";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? throw new NullReferenceException("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+builder.Services
+    .AddCommonObservability(serviceName, otlpEndpoint);
 
 var app = builder.Build();
 app.Run();

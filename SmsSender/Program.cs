@@ -3,6 +3,7 @@ using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using CommonShared.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SmsSender.Configuration;
@@ -38,6 +39,11 @@ builder.Services
     .Bind(builder.Configuration.GetSection("SmsSettings"))
     .ValidateOnStart();
 
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "SmsSender";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? throw new NullReferenceException("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+builder.Services
+    .AddCommonObservability(serviceName, otlpEndpoint);
 
 var app = builder.Build();
 app.Run();

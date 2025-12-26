@@ -3,6 +3,7 @@ using Minio;
 using CommonShared.Infrastructure.DataStorage;
 using CommonShared.Infrastructure.DataStorage.Services;
 using CommonShared.Infrastructure.Messaging.Services;
+using CommonShared.Observability;
 using MessengerSender.Configuration;
 using MessengerSender.Infrastructure.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,12 @@ builder.Services
     .AddOptions<MessengerSettings>()
     .Bind(builder.Configuration.GetSection("MessengerSettings"))
     .ValidateOnStart();
+
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "MessengerSender";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? throw new NullReferenceException("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+builder.Services
+    .AddCommonObservability(serviceName, otlpEndpoint);
 
 var app = builder.Build();
 app.Run();
